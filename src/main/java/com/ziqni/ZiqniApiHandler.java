@@ -40,18 +40,4 @@ public class ZiqniApiHandler {
             return Future.failedFuture("Request failed with status code: " + response.statusCode() + ", message: " + response.statusMessage());
         }
     }
-
-    public static void main(String[] args) {
-        Vertx vertx = Vertx.vertx();
-        ZiqniApiHandler handler = new ZiqniApiHandler(vertx);
-
-        String[] origins = {"origin1", "origin2"};
-        handler.postToZiqniApi("someApiKey", true, origins, "someMember", 72)
-                .onSuccess(response -> {
-                    System.out.println("Response: " + response.encodePrettily());
-                })
-                .onFailure(err -> {
-                    System.err.println("Error: " + err.getMessage());
-                });
-    }
 }
