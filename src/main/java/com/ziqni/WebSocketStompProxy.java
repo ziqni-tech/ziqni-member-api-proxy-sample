@@ -28,8 +28,7 @@ public class WebSocketStompProxy {
 
         server.webSocketHandler(clientWebSocket -> {
             // Call Ziqni API to get the passcode (jwtToken)
-            String[] origins = {"origin1", "origin2"};
-            ziqniApiHandler.postToZiqniApi("someApiKey", true, origins, "someMember", 72)
+            ziqniApiHandler.postToZiqniApi("someApiKey", true, null, "someMemberRefId", 72)
                     .onSuccess(response -> {
                         String jwtToken = response.getJsonObject("data").getString("jwtToken");
 
