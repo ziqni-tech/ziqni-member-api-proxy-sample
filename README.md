@@ -1,55 +1,76 @@
-ZIQNI Member API
-=========================
-### Sample webSocket proxy using Vert.x
+WebSocket STOMP Proxy with Dynamic Authentication Token
+=======================================================
 
-Vert.x, is well-suited for creating WebSocket proxy applications. Here's a simplified version using Vert.x:
+### Overview
 
-    import io.vertx.core.Vertx;
-    import io.vertx.core.http.HttpClient;
-    import io.vertx.core.http.HttpServer;
-    import io.vertx.core.http.WebSocket;
-    
-    public class WebSocketProxy {
-    public static void main(String[] args) {
-    Vertx vertx = Vertx.vertx();
-    HttpServer server = vertx.createHttpServer();
+In this implementation, we created a WebSocket proxy using Vert.x, which also handles a dynamic STOMP authentication. The proxy intercepts the initial WebSocket message to send a STOMP CONNECT message containing a passcode that is dynamically retrieved from a REST API (ZiqniApiHandler). This guide explains how this integration works step by step.
 
-        server.webSocketHandler(clientWebSocket -> {
-            HttpClient httpClient = vertx.createHttpClient();
-            httpClient.webSocket(443, "target-websocket-server.com", "/", targetWebSocketAsyncResult -> {
-                if (targetWebSocketAsyncResult.succeeded()) {
-                    WebSocket targetWebSocket = targetWebSocketAsyncResult.result();
+### Key Components
 
-                    // Forward messages from client to target server
-                    clientWebSocket.handler(data -> targetWebSocket.writeBinaryMessage(data));
+ZiqniApiHandler: Handles the HTTP POST request to the ZIQNI API to retrieve a JWT token used for authentication.
 
-                    // Forward messages from target server back to client
-                    targetWebSocket.handler(data -> clientWebSocket.writeBinaryMessage(data));
+WebSocketStompProxy: The WebSocket proxy server that intercepts incoming WebSocket connections, retrieves an authentication token, and sends a STOMP CONNECT message.
 
-                    clientWebSocket.closeHandler(v -> targetWebSocket.close());
-                    targetWebSocket.closeHandler(v -> clientWebSocket.close());
-                } else {
-                    clientWebSocket.close();
-                }
-            });
-        }).listen(8080);
-    }
-}
+Steps Explained
 
-##### In this example:
+#### 1. Creating ZiqniApiHandler
 
-Vert.x is used to create a WebSocket server and client.
-The WebSocket client (httpClient.webSocket) connects to the target WebSocket server.
-Messages are forwarded between the client and server sockets.
+We created a class named ZiqniApiHandler that handles interactions with the ZIQNI member API (https://member-api.ziqni.com). The main purpose of this class is to make a POST request to the API and return a Future<JsonObject> containing the authentication information.
 
-In the Vert.x WebSocket proxy example provided, each client connecting to your server will get its own connection to the proxied server. When a client connects to your server, a new WebSocket connection to the target (proxied) server is established specifically for that client. This approach ensures that each client has an independent communication channel to the target server.
+Method: postToZiqniApi(String apiKey, boolean isReferenceId, String[] origins, String member, int expires)
 
-##### Here is how it works in the example:
+Request Payload:
 
-Client Connection: When a client initiates a WebSocket connection to your server, the server.webSocketHandler() gets called, creating a new connection handler for that client.
+apiKey: The API key for authentication.
 
-Target WebSocket Connection: Inside this handler, a new connection is established to the proxied server using httpClient.webSocket(...). This connection is unique for each client.
+isReferenceId: A boolean flag.
 
-Message Handling: Any message received from the client is forwarded to the target server through this dedicated connection, and any message received from the target server is sent back to the respective client.
+origins, member, expires: Additional parameters required by the API.
 
-This means that every client will get its own WebSocket connection to both your proxy server and the downstream server, providing isolation and ensuring that client communications are not shared.
+Response: Returns the jwtToken used for subsequent authentication.
+
+#### 2. Setting up the WebSocket Proxy Server
+
+We implemented WebSocketStompProxy to act as a WebSocket proxy server that connects clients to a target WebSocket server.
+
+HTTP Server Setup: A Vert.x HTTP server listens for incoming WebSocket connections.
+
+Intercept Initial Client Connection: When a client connects, we call ZiqniApiHandler.postToZiqniApi() to retrieve the jwtToken for authentication.
+
+Construct the STOMP CONNECT Message:
+
+Once the token is retrieved successfully, we construct a STOMP CONNECT message:
+
+String stompAuthMessage = "CONNECT\naccept-version:1.2\nhost:example.com\nlogin:username\npasscode:" + jwtToken + "\n\n\0";
+
+This message includes a dynamically generated passcode (jwtToken) obtained from ZiqniApiHandler.
+
+#### 3. Handling the WebSocket Proxy Logic
+
+Connect to Target WebSocket Server: After retrieving the jwtToken, the proxy establishes a connection to the target WebSocket server.
+
+Send the STOMP CONNECT Message: The stompAuthMessage is sent to the target server to initiate the STOMP protocol authentication.
+
+Message Forwarding: Subsequent messages between the client and the target server are forwarded bi-directionally:
+
+Client to Target Server: Messages from the client are sent to the target WebSocket server.
+
+Target Server to Client: Messages from the target server are forwarded back to the client.
+
+#### 4. Error Handling
+
+If the ZiqniApiHandler.postToZiqniApi() call fails (e.g., due to authentication issues), the client connection is immediately closed, and an error message is provided.
+
+If the target WebSocket server connection fails, the client connection is also closed.
+
+#### Summary
+
+This solution allows for a dynamic authentication mechanism when proxying WebSocket connections. The main steps involved are:
+
+Retrieve a jwtToken from the ZIQNI member API using ZiqniApiHandler.
+
+Use this token as the passcode in a STOMP CONNECT message.
+
+Establish and maintain the WebSocket proxy connection, forwarding messages between the client and the target server.
+
+The design ensures that each client connection is authenticated using a unique token retrieved dynamically, making the solution more secure and adaptable to different client sessions.
