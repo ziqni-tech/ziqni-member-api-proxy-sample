@@ -8,7 +8,7 @@ import io.vertx.core.http.WebSocket;
 
 public class WebSocketStompProxy {
 
-    private static final String ZIQNI_MEMBER_API = "https://member-api.ziqni.com";
+    private static final String ZIQNI_MEMBER_API = "member-api.ziqni.com";
     private final Vertx vertx;
     private final ZiqniApiHandler ziqniApiHandler;
 
@@ -38,7 +38,7 @@ public class WebSocketStompProxy {
 
                         // Establish connection to the target WebSocket server
                         HttpClient httpClient = vertx.createHttpClient();
-                        httpClient.webSocket(443, "target-websocket-server.com", "/", targetWebSocketAsyncResult -> {
+                        httpClient.webSocket(443, ZIQNI_MEMBER_API, "/", targetWebSocketAsyncResult -> {
                             if (targetWebSocketAsyncResult.succeeded()) {
                                 WebSocket targetWebSocket = targetWebSocketAsyncResult.result();
 
